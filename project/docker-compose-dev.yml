@@ -1,0 +1,197 @@
+version: '3'
+services:
+
+  # API-Gateway
+  gateway:
+    container_name: gateway-service-1
+    user: ${USER_NAME}
+    build:
+      context: ./../gateway
+      dockerfile: ./../gateway/Dockerfile.dev
+      args:
+        - GROUP_ID=${GROUP_ID}
+        - GROUP_NAME=${GROUP_NAME}
+        - USER_ID=${USER_ID}
+        - USER_NAME=${USER_NAME}
+    tty: true
+    ports:
+      - "8080:${GATEWAY_REST_PORT:-80}"
+    volumes:
+      - ./../gateway:/go/src/github.com/yaroyan/ms/gateway
+    environment:
+      - REST_PORT=${GATEWAY_REST_PORT:-80}
+
+  # # Font-end-React
+  # client:
+  #   container_name: client-service-1
+  #   user: node
+  #   environment:
+  #     NODE_ENV: development
+  #   build:
+  #     context: ./../client
+  #     dockerfile: ./../client/Dockerfile.dev
+  #   ports:
+  #     - "3000:3000"
+  #   tty: true
+  #   volumes:
+  #     - ./../client:/usr/src
+  #   # command: sh -c "yarn start"
+
+  # Authn
+  authn:
+    container_name: authn-service-1
+    user: ${USER_NAME}
+    build:
+      context: ./../authn
+      dockerfile: ./../authn/Dockerfile.dev
+      args:
+        - GROUP_ID=${GROUP_ID}
+        - GROUP_NAME=${GROUP_NAME}
+        - USER_ID=${USER_ID}
+        - USER_NAME=${USER_NAME}
+    expose:
+      - ${AUTHN_REST_PORT:-80}
+    tty: true
+    volumes:
+      - ./../authn:/go/src/github.com/yaroyan/ms/authn
+    environment:
+      DSN: "host=postgres port=5432 user=postgres password=password dbname=users sslmode=disable timezone=UTC connect_timeout=5"
+      REST_PORT: ${AUTHN_REST_PORT:-80}
+
+  # Authz
+  authz:
+    container_name: authz-service-1
+    user: ${USER_NAME}
+    build:
+      context: ./../authz
+      dockerfile: ./../authz/Dockerfile.dev
+      args:
+        - GROUP_ID=${GROUP_ID}
+        - GROUP_NAME=${GROUP_NAME}
+        - USER_ID=${USER_ID}
+        - USER_NAME=${USER_NAME}
+    expose:
+      - ${AUTHZ_REST_PORT:-80}
+    tty: true
+    volumes:
+      - ./../authz:/go/src/github.com/yaroyan/ms/authz
+    environment:
+      DSN: "host=postgres port=${POSTGRES_PORT} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD} dbname=users sslmode=disable timezone=UTC connect_timeout=5"
+      REST_PORT: ${AUTHZ_REST_PORT:-80}
+
+  # Postgres
+  postgres:
+    image: 'postgres:15-alpine'
+    container_name: postgres-service-1
+    expose:
+      - ${POSTGRES_PORT:-5432}
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./db-data/postgres/:/var/lib/postgresql/data/
+
+  # Logger
+  logger:
+    container_name: logger-service-1
+    user: ${USER_NAME}
+    build:
+      context: ./../logger
+      dockerfile: ./../logger/Dockerfile.dev
+      args:
+        - GROUP_ID=${GROUP_ID}
+        - GROUP_NAME=${GROUP_NAME}
+        - USER_ID=${USER_ID}
+        - USER_NAME=${USER_NAME}
+    tty: true
+    expose:
+      - ${LOGGER_REST_PORT:-80}
+      - ${LOGGER_RPC_PORT:-5001}
+      - ${LOGGER_GRPC_PORT:-50001}
+    volumes:
+      - ./../logger:/go/src/github.com/yaroyan/ms/logger
+    environment:
+      - MONGO_URI=mongodb://mongo:${MONGO_PORT:-27017}
+      - MONGO_USER=${MONGO_USER}
+      - MONGO_PASSWORD=${MONGO_PASSWORD}
+      - REST_PORT=${LOGGER_REST_PORT:-80}
+      - RPC_PORT=${LOGGER_RPC_PORT:-5001}
+      - GRPC_PORT=${LOGGER_GRPC_PORT:-50001}
+
+  # Mongo
+  mongo:
+    container_name: mongo-service-1
+    image: 'mongo:5.0.14'
+    expose:
+      - ${MONGO_PORT:-27017}
+    environment:
+      MONGO_INITDB_DATABASE: logs
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+    volumes:
+      - ./db-data/mongo/:/data/db
+
+  # E-Mail
+  mailer:
+    container_name: mailer-service-1
+    user: ${USER_NAME}
+    build:
+      context: ./../mailer
+      dockerfile: ./../mailer/Dockerfile.dev
+      args:
+        - GROUP_ID=${GROUP_ID}
+        - GROUP_NAME=${GROUP_NAME}
+        - USER_ID=${USER_ID}
+        - USER_NAME=${USER_NAME}
+    tty: true
+    expose:
+      - ${MAILER_REST_PORT:-80}
+    environment:
+      MAIL_DOMAIN: localhost
+      MAIL_HOST: mailhog
+      MAIL_PORT: 1025
+      MAIL_ENCRYPTION: none
+      MAIL_USERNAME: ""
+      MAIL_PASSWORD: ""
+      FROM_NAME: "John Smith"
+      FROM_ADDRESS: john.smith@example.com
+    volumes:
+      - ./../mailer:/go/src/github.com/yaroyan/ms/mailer
+
+  # mailhog
+  mailhog:
+    container_name: mailhog-service-1
+    image: 'mailhog/mailhog:latest'
+    ports:
+      - "1025:1025" 
+      - "8025:8025"
+
+  # Listener
+  listener:
+    container_name: listener-service-1
+    user: ${USER_NAME}
+    build:
+      context: ./../listener
+      dockerfile: ./../listener/Dockerfile.dev
+      args:
+        - GROUP_ID=${GROUP_ID}
+        - GROUP_NAME=${GROUP_NAME}
+        - USER_ID=${USER_ID}
+        - USER_NAME=${USER_NAME}
+    tty: true
+    expose:
+      - 80
+    volumes:
+      - ./../listener:/go/src/github.com/yaroyan/ms/listener
+    environment:
+      - RABBIT_MQ_URI=amqp://guest:guest@rabbitmq
+
+  # RabbitMQ
+  rabbitmq:
+    image: 'rabbitmq:3.11-alpine'
+    container_name: rabbitmq-service-1
+    expose:
+      - 5672
+    volumes:
+      - ./db-data/rabbitmq/:/var/lib/rabbitmq/

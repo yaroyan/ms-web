@@ -1,0 +1,19 @@
+FROM golang:1.21-alpine
+
+# git
+RUN apk update && \
+    apk add --no-cache \
+    alpine-sdk \
+    git
+
+ARG GROUP_ID
+ARG GROUP_NAME
+ARG USER_ID
+ARG USER_NAME
+
+RUN addgroup -S -g ${GROUP_ID} ${GROUP_NAME} && \
+    adduser -u ${USER_ID} -S ${USER_NAME} -G ${GROUP_NAME} -D ${USER_NAME} -s /bin/ash && \
+    chown ${USER_NAME}:${GROUP_NAME} -R /home/${USER_NAME}/ && \
+    chown ${USER_NAME}:${GROUP_NAME} -R /go
+
+# RUN go install github.com/google/wire/cmd/wire@latest
